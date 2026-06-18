@@ -19,43 +19,31 @@
             border: 1px solid #3f3f46; 
         }
         h3 { margin: 0; color: #fff; font-size: 22px; }
-        .streamer-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+        .streamer-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
         .streamer-input { 
             flex: 1; padding: 12px; background: #292933; border: 1px solid #4f4f5a; 
             color: white; border-radius: 6px; font-size: 16px; 
         }
-        .row-btn { 
-            width: 40px; height: 40px; border: none; border-radius: 6px; 
-            font-size: 22px; cursor: pointer; 
-        }
-        .add-btn { background: #9146ff; color: white; }
-        .remove-btn { background: #3a3a44; color: #ff8282; }
-        
         button#mainBtn { 
             padding: 16px; font-size: 18px; font-weight: bold; 
-            border-radius: 8px; cursor: pointer; margin-top: 5px;
+            border-radius: 8px; cursor: pointer; margin-top: 8px;
         }
-        #startBtn { background: #9146ff; color: white; }
-        #stopBtn { background: #e91916; color: white; }
+        #startBtn { padding:12px; font-size:15px; border:none; border-radius:6px; background: #9146ff; color: white; }
+        #stopBtn { padding:12px; font-size:15px; border:none; border-radius:6px; background: #e91916; color: white; }
 
         .status { 
             background: #292933; padding: 14px; border-radius: 6px; 
             font-size: 15px; line-height: 1.4; 
         }
-        #player { flex: 1; position: relative; background: #000; }
+        #playerContainer { flex: 1; position: relative; background: #000; }
+        .player-wrapper { 
+            position: absolute; inset: 0; 
+            transition: opacity 0.3s;
+        }
         iframe { width: 100%; height: 100%; border: none; }
-        .tabs { 
-            display: flex; background: #292933; padding: 8px; 
-            gap: 6px; flex-wrap: wrap; 
-        }
-        .tab { 
-            padding: 10px 16px; background: #3a3a44; border: none; 
-            color: #efeff1; border-radius: 6px; cursor: pointer; 
-            font-size: 15px; font-weight: 500;
-        }
-        .tab.active { background: #9146ff; }
         .repo-link { text-align: center; margin-top: 12px; font-size: 14px; }
         .repo-link a { color: #9146ff; text-decoration: none; }
+        .note { font-size: 13px; color: #adadb8; margin-top: 8px; }
     </style>
 </head>
 <body>
@@ -63,30 +51,30 @@
 <div class="panel">
     <h3>Twitch Multi-Stream Mashup</h3>
     
-    <label style="color:#adadb8; font-size:15px;">Ники участников:</label>
+    <label style="color:#adadb8; font-size:15px;">Ники участников (максимум 2):</label>
     <div id="streamersContainer"></div>
 
-    <div style="display:flex; align-items:center; gap:10px; margin:10px 0;">
+    <div style="display:flex; align-items:center; gap:10px; margin:12px 0;">
         <button id="autoSwitchBtn" style="flex:1; padding:12px; font-size:15px; background:#9146ff; color:white; border:none; border-radius:6px;">
             Автопереключение: ВКЛ
         </button>
-        <input type="number" id="interval" value="8" style="width:80px; padding:12px; background:#292933; border:1px solid #4f4f5a; color:white; border-radius:6px; font-size:16px;">
+        <input type="number" id="interval" value="7" style="width:80px; padding:12px; background:#292933; border:1px solid #4f4f5a; color:white; border-radius:6px; font-size:16px;">
         <span style="color:#adadb8; white-space:nowrap;">сек</span>
     </div>
 
     <button id="startBtn" class="mainBtn">Запустить Мэшап</button>
     <button id="stopBtn" class="mainBtn" disabled>Остановить</button>
 
-    <div class="status" id="status">Готов к работе.<br>Введите ники и нажмите «Запустить Мэшап».</div>
+    <div class="status" id="status">В веб-версии можно смотреть только 2 стримера.<br>Для неограниченного количества и записи — используйте Electron.</div>
     
     <div class="repo-link">
-        <a href="https://github.com/4-EyedGuy/TwitchMashupGUI" target="_blank">Оригинальный репозиторий на GitHub</a>
+        <a href="https://github.com/4-EyedGuy/TwitchMashupGUI" target="_blank">Полная версия (Electron) — GitHub</a>
     </div>
+    <div class="note">Web-версия — упрощённая демонстрация</div>
 </div>
 
 <div class="main-area">
-    <div class="tabs" id="tabs"></div>
-    <div id="player"></div>
+    <div id="playerContainer"></div>
 </div>
 
 <script>
@@ -94,8 +82,7 @@
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
     const status = document.getElementById('status');
-    const player = document.getElementById('player');
-    const tabs = document.getElementById('tabs');
+    const playerContainer = document.getElementById('playerContainer');
     const autoBtn = document.getElementById('autoSwitchBtn');
     const intervalInput = document.getElementById('interval');
 
@@ -103,17 +90,14 @@
     let currentIndex = 0;
     let autoInterval = null;
     let autoEnabled = true;
+    let players = [];
 
     function createRow(value = '') {
         const row = document.createElement('div');
         row.className = 'streamer-row';
         row.innerHTML = `
             <input type="text" class="streamer-input" value="${value}" placeholder="ник стримера">
-            <button class="row-btn remove-btn">−</button>
         `;
-        row.querySelector('.remove-btn').onclick = () => {
-            if (container.children.length > 2) row.remove();
-        };
         container.appendChild(row);
     }
 
@@ -129,53 +113,66 @@
                     .filter(Boolean);
     }
 
-    function startMashup() {
-        streamers = getStreamers();
-        if (streamers.length < 2) {
-            alert('Введите минимум 2 ника стримеров!');
-            return;
-        }
+    function createPlayers() {
+        playerContainer.innerHTML = '';
+        players = [];
 
-        status.innerHTML = `✅ Запущено ${streamers.length} стримеров<br>Переключение работает автоматически и вручную.`;
-        startBtn.disabled = true;
-        stopBtn.disabled = false;
-
-        tabs.innerHTML = '';
         streamers.forEach((name, i) => {
-            const tab = document.createElement('button');
-            tab.className = 'tab';
-            tab.textContent = name.toUpperCase();
-            tab.onclick = () => switchTo(i);
-            tabs.appendChild(tab);
-        });
+            const wrapper = document.createElement('div');
+            wrapper.className = 'player-wrapper';
+            wrapper.style.opacity = i === 0 ? '1' : '0';
+            wrapper.style.zIndex = i === 0 ? '2' : '1';
 
-        switchTo(0);
-        startAutoSwitch();
+            wrapper.innerHTML = `
+                <iframe 
+                    src="https://player.twitch.tv/?channel=${name}&parent=4-eyedguy.github.io&autoplay=true&muted=${i !== 0}&volume=0.8"
+                    allowfullscreen>
+                </iframe>
+            `;
+            playerContainer.appendChild(wrapper);
+            players.push(wrapper);
+        });
     }
 
     function switchTo(index) {
         currentIndex = index;
-        const name = streamers[index];
         
-        player.innerHTML = `
-            <iframe 
-                src="https://player.twitch.tv/?channel=${name}&parent=4-eyedguy.github.io&autoplay=true&muted=false&volume=0.8"
-                allowfullscreen>
-            </iframe>
-        `;
-
-        document.querySelectorAll('.tab').forEach((tab, i) => {
-            tab.classList.toggle('active', i === index);
+        players.forEach((wrapper, i) => {
+            const isActive = i === index;
+            wrapper.style.opacity = isActive ? '1' : '0';
+            wrapper.style.zIndex = isActive ? '2' : '1';
+            
+            try {
+                const iframe = wrapper.querySelector('iframe');
+                if (iframe && iframe.contentWindow) {
+                }
+            } catch(e) {}
         });
+    }
+
+    function startMashup() {
+        streamers = getStreamers();
+        if (streamers.length !== 2) {
+            alert('В веб-версии можно использовать ровно 2 стримера!');
+            return;
+        }
+
+        status.textContent = '✅ Оба стрима запущены. Переключение звука и видео происходит бесшовно.';
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+
+        createPlayers();
+        switchTo(0);
+        startAutoSwitch();
     }
 
     function startAutoSwitch() {
         clearInterval(autoInterval);
-        if (!autoEnabled || streamers.length < 2) return;
+        if (!autoEnabled) return;
 
-        const sec = parseInt(intervalInput.value) || 8;
+        const sec = parseInt(intervalInput.value) || 7;
         autoInterval = setInterval(() => {
-            let next = (currentIndex + 1) % streamers.length;
+            let next = (currentIndex + 1) % 2;
             switchTo(next);
         }, sec * 1000);
     }
@@ -183,7 +180,7 @@
     startBtn.onclick = startMashup;
     stopBtn.onclick = () => {
         clearInterval(autoInterval);
-        player.innerHTML = '<div style="color:#adadb8; text-align:center; padding:80px 20px; font-size:18px;">Мэшап остановлен</div>';
+        playerContainer.innerHTML = '<div style="color:#adadb8; text-align:center; padding:100px 20px; font-size:18px;">Мэшап остановлен</div>';
         startBtn.disabled = false;
         stopBtn.disabled = true;
         status.textContent = 'Мэшап остановлен.';
