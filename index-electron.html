@@ -11,6 +11,41 @@
         h3 { margin: 0 0 5px 0; color: #fff; word-break: break-word; }
         textarea { padding: 10px; border: 1px solid #3f3f46; background: #1e1e22; color: white; border-radius: 4px; font-size: 13px; resize: none; height: 80px; }
         button { padding: 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 14px; }
+        #streamerTabs {
+            display: flex; 
+            gap: 6px; 
+            padding: 10px; 
+            background: #1e1e22; 
+            border-bottom: 1px solid #3f3f46; 
+            overflow-x: auto;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 10px 18px;
+            background: #2a2a2e;
+            border: 1px solid #3f3f46;
+            color: #b0b0b8;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+
+        .tab-btn:hover {
+            background: #3a3a42;
+            color: #e4e4e7;
+        }
+
+        .tab-btn.active {
+            background: #9146ff !important;
+            color: white !important;
+            border-color: #a970ff;
+            box-shadow: 0 0 12px rgba(145, 70, 255, 0.5);
+            transform: scale(1.03);
+        }
         .streamers-container { display: flex; flex-direction: column; gap: 6px; }
         .streamer-row { display: flex; align-items: flex-start; gap: 6px; }
         .streamer-row .input-wrapper { flex: 1; min-width: 0; position: relative; }
@@ -351,6 +386,26 @@
                 }
             });
         }
+        
+        function createStreamerTabs(streamers) {
+            streamerTabs.innerHTML = '';
+
+            streamers.forEach((streamer, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'tab-btn';
+                btn.textContent = streamer.toUpperCase();
+                
+                if (index === currentStreamerIndex) {
+                    btn.classList.add('active');
+                }
+
+                btn.addEventListener('click', () => {
+                    switchToStreamer(index);
+                });
+
+                streamerTabs.appendChild(btn);
+            });
+        }
 
         function createStreamerRow(value = '') {
             const row = document.createElement('div');
@@ -592,6 +647,9 @@
                 }
             });
 
+            document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+                btn.classList.toggle('active', i === index);
+            });
         }
 
         function setupStreamTabs(streamers) {

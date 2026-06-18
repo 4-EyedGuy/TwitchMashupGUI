@@ -45,7 +45,7 @@ function createWindow() {
         }
     );
 
-    mainWindow.loadFile('index.html');
+    mainWindow.loadFile('index-electron.html');
 
     // mainWindow.webContents.openDevTools();
     
