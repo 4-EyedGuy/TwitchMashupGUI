@@ -1,15 +1,13 @@
-<!-- index.html -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Twitch Multi-Stream Mashup</title>
+    <title>Twitch Multi-Stream Mashup (Web)</title>
     <style>
         body { margin: 0; padding: 15px; font-family: sans-serif; background: #121214; color: white; display: flex; height: 95vh; gap: 15px; overflow: hidden; }
         .panel { width: 340px; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; }
         .chat-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; background: #1e1e22; border-radius: 6px; border: 1px solid #3f3f46; }
         h3 { margin: 0 0 5px 0; color: #fff; word-break: break-word; }
-        textarea { padding: 10px; border: 1px solid #3f3f46; background: #1e1e22; color: white; border-radius: 4px; font-size: 13px; resize: none; height: 80px; }
         button { padding: 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 14px; }
         .streamers-container { display: flex; flex-direction: column; gap: 6px; }
         .streamer-row { display: flex; align-items: flex-start; gap: 6px; }
@@ -139,7 +137,6 @@
         #startBtn { background: #9146ff; color: white; }
         #stopBtn { background: #eb0400; color: white; }
         #status { color: #a9a9b2; font-size: 13px; line-height: 1.4; word-break: break-all; }
-        iframe { width: 100%; height: 100%; border: none; }
         #playerContainer { flex: 1; position: relative; overflow: hidden; background: #000; border-radius: 0 0 6px 6px; }
         #videoContainer { position: relative; width: 100%; height: 100%; }
         .video-wrapper { width: 100%; height: 100%; position: absolute; inset: 0; }
@@ -150,14 +147,33 @@
             width: 100%;
             height: 100%;
             object-fit: contain;
-            pointer-events: none;
         }
         .player-lock-overlay {
             position: absolute;
             inset: 0;
             z-index: 20;
             cursor: default;
-            background: transparent;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 18px;
+            text-align: center;
+        }
+        .tab-btn {
+            padding: 8px 12px;
+            background: #2a2a2e;
+            border: none;
+            color: #a9a9b2;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+        .tab-btn.active {
+            background: #9146ff;
+            color: white;
         }
     </style>
 </head>
@@ -165,62 +181,62 @@
 
     <!-- ЛЕВАЯ ПАНЕЛЬ -->
     <div class="panel">
-        <h3>Twitch Multi-Stream Mashup</h3>
-        
-        <input type="hidden" id="clientId">
-        <input type="hidden" id="accessToken">
+        <h3>Twitch Multi-Stream Mashup (Web)</h3>
         
         <label style="color: #a9a9b2; font-size: 13px;">Ники участников:</label>
         <div class="streamers-container" id="streamersContainer"></div>
         
         <div class="auto-switch-row">
-            <button type="button" id="autoSwitchBtn" class="auto-switch-btn active" title="Автоматически переключать вкладки">
+            <button type="button" id="autoSwitchBtn" class="auto-switch-btn active" title="Автоматически переключать">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
                 </svg>
             </button>
             <span class="auto-switch-label">каждые</span>
-            <input
-                type="number"
-                id="switchInterval"
-                class="switch-interval-input"
-                min="1"
-                max="300"
-                value="5"
-            >
+            <input type="number" id="switchInterval" class="switch-interval-input" min="1" max="300" value="5">
             <span class="auto-switch-label">сек</span>
         </div>
 
         <div style="margin-top: 10px; padding: 10px; background: #1e1e22; border-radius: 4px; border: 1px solid #3f3f46; min-height: 60px;">
             <strong style="color: #fff; font-size: 13px;">Найдено участников:</strong>
-            <div id="streamersList" style="color: #a9a9b2; font-size: 12px; margin-top: 5px; line-height: 1.4;">Ожидание...</div>
+            <div id="streamersList" style="color: #a9a9b2; font-size: 12px; margin-top: 5px; line-height: 1.4;">Ожидание запуска...</div>
         </div>
         
         <button id="startBtn" style="margin-top: 10px;">Запустить Мэшап</button>
         <button id="stopBtn" disabled>Остановить</button>
         
         <div style="margin-top: 10px;"><strong>Статус:</strong></div>
-        <div id="status">Ожидание запуска...</div>
+        <div id="status">В веб-версии доступен только просмотр. Полный функционал — в Electron-приложении.</div>
     </div>
 
-    <!-- ПРАВАЯ ПАНЕЛЬ (ВИДЕОПЛЕЕР С ВКЛАДКАМИ) -->
+    <!-- ПРАВАЯ ПАНЕЛЬ -->
     <div class="chat-container">
         <div style="display: flex; gap: 8px; padding: 10px; background: #1e1e22; border-bottom: 1px solid #3f3f46; overflow-x: auto;" id="streamerTabs"></div>
-        <div id="playerContainer" style="flex: 1; display: flex; align-items: center; justify-content: center; background: #000;">
-            <div id="videoContainer">
-                <div class="player-lock-overlay" id="playerLockOverlay" hidden></div>
+        <div id="playerContainer" style="flex: 1; position: relative; background: #000;">
+            <div id="videoContainer"></div>
+            <div class="player-lock-overlay" id="playerLockOverlay">
+                Нажмите «Запустить Мэшап» для начала
             </div>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script>
-        const { ipcRenderer } = require('electron');
+        const ipcRenderer = {
+            send: (channel, data) => {
+                console.log(`[WEB] ${channel}`, data);
+                if (channel === 'start-mashup') {
+                    status.textContent = 'В веб-версии запуск мэшапа невозможен. Используйте Electron-версию для полной работы.';
+                }
+            },
+            on: (channel, callback) => {
+                console.log(`[WEB] Listener registered: ${channel}`);
+            }
+        };
 
         const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
         const streamersContainer = document.getElementById('streamersContainer');
-        const clientIdInput = document.getElementById('clientId');
-        const accessTokenInput = document.getElementById('accessToken');
         const status = document.getElementById('status');
         const videoContainer = document.getElementById('videoContainer');
         const playerLockOverlay = document.getElementById('playerLockOverlay');
@@ -228,6 +244,7 @@
         const streamersList = document.getElementById('streamersList');
         const autoSwitchBtn = document.getElementById('autoSwitchBtn');
         const switchIntervalInput = document.getElementById('switchInterval');
+
         let autoSwitchEnabled = true;
         let foundStreamers = [];
         let currentStreamerIndex = 0;
@@ -239,38 +256,25 @@
 
         function getRecentNicknames() {
             const stored = localStorage.getItem('recentNicknames');
-            if (stored) {
-                return JSON.parse(stored);
-            }
-
-            const legacy = JSON.parse(localStorage.getItem('recentStreamers') || '[]');
-            const migrated = [...new Set(
-                legacy.flatMap(entry => entry.split(/\s+/).filter(Boolean))
-            )];
-            if (migrated.length > 0) {
-                localStorage.setItem('recentNicknames', JSON.stringify(migrated.slice(0, 20)));
-            }
-            return migrated;
+            if (stored) return JSON.parse(stored);
+            return [];
         }
 
         function saveNickname(nickname) {
             const nick = nickname.trim().toLowerCase();
             if (!nick) return;
-
-            const recent = getRecentNicknames().filter(n => n !== nick);
+            let recent = getRecentNicknames().filter(n => n !== nick);
             recent.unshift(nick);
             localStorage.setItem('recentNicknames', JSON.stringify(recent.slice(0, 20)));
         }
 
         function removeRecentNickname(nickname) {
-            const recent = getRecentNicknames().filter(n => n !== nickname);
+            let recent = getRecentNicknames().filter(n => n !== nickname);
             localStorage.setItem('recentNicknames', JSON.stringify(recent));
         }
 
         function hideAllDropdowns() {
-            streamersContainer.querySelectorAll('.recent-dropdown').forEach(d => {
-                d.classList.remove('open');
-            });
+            streamersContainer.querySelectorAll('.recent-dropdown').forEach(d => d.classList.remove('open'));
             activeDropdown = null;
         }
 
@@ -300,8 +304,6 @@
 
                 const deleteBtn = document.createElement('button');
                 deleteBtn.className = 'recent-item-delete';
-                deleteBtn.type = 'button';
-                deleteBtn.title = 'Удалить из истории';
                 deleteBtn.textContent = '×';
                 deleteBtn.addEventListener('mousedown', (e) => {
                     e.preventDefault();
@@ -343,12 +345,8 @@
                 const isLast = index === rows.length - 1;
                 const isExtraRow = index >= MIN_STREAMER_ROWS;
 
-                if (removeBtn) {
-                    removeBtn.classList.toggle('invisible', !isExtraRow);
-                }
-                if (addBtn) {
-                    addBtn.classList.toggle('invisible', !isLast);
-                }
+                if (removeBtn) removeBtn.classList.toggle('invisible', !isExtraRow);
+                if (addBtn) addBtn.classList.toggle('invisible', !isLast);
             });
         }
 
@@ -378,7 +376,6 @@
             const removeBtn = document.createElement('button');
             removeBtn.type = 'button';
             removeBtn.className = 'row-action-btn remove-btn';
-            removeBtn.title = 'Удалить строку';
             removeBtn.textContent = '×';
             removeBtn.addEventListener('click', () => {
                 if (getStreamerRows().indexOf(row) < MIN_STREAMER_ROWS) return;
@@ -389,7 +386,6 @@
             const addBtn = document.createElement('button');
             addBtn.type = 'button';
             addBtn.className = 'row-action-btn add-btn';
-            addBtn.title = 'Добавить участника';
             addBtn.textContent = '+';
             addBtn.addEventListener('click', () => {
                 createStreamerRow();
@@ -418,62 +414,9 @@
 
         initStreamerRows();
 
-        function lockPlayer() {
-            isMashupActive = true;
-            playerLockOverlay.hidden = false;
-        }
-
-        function unlockPlayer() {
-            isMashupActive = false;
-            playerLockOverlay.hidden = true;
-        }
-
-        function setupLockedVideo(video) {
-            video.controls = false;
-            video.disablePictureInPicture = true;
-            video.disableRemotePlayback = true;
-            video.playsInline = true;
-            video.volume = STREAM_VOLUME;
-
-            video.addEventListener('pause', () => {
-                if (isMashupActive) {
-                    video.play().catch(() => {});
-                }
-            });
-
-            video.addEventListener('volumechange', () => {
-                if (video.volume !== STREAM_VOLUME) {
-                    video.volume = STREAM_VOLUME;
-                }
-            });
-        }
-
         function clearVideoPlayers() {
-            videoContainer.querySelectorAll('.video-wrapper').forEach(el => el.remove());
+            videoContainer.innerHTML = '';
         }
-
-        function updateAutoSwitchUI() {
-            autoSwitchBtn.classList.toggle('active', autoSwitchEnabled);
-            autoSwitchBtn.title = autoSwitchEnabled
-                ? 'Авто-смена включена'
-                : 'Авто-смена выключена';
-            switchIntervalInput.disabled = !autoSwitchEnabled;
-        }
-
-        autoSwitchEnabled =
-            localStorage.getItem('autoSwitchEnabled') !== 'false';
-        switchIntervalInput.value =
-            localStorage.getItem('switchInterval') || '5';
-        updateAutoSwitchUI();
-
-        ipcRenderer.on('load-config', (event, config) => {
-            if (config.clientId) {
-                clientIdInput.value = config.clientId;
-            }
-            if (config.accessToken) {
-                accessTokenInput.value = config.accessToken;
-            }
-        });
 
         function createPlayers(videoUrls) {
             clearVideoPlayers();
@@ -489,189 +432,93 @@
                 video.id = `player-${streamer}`;
                 video.autoplay = true;
                 video.muted = index !== 0;
-                setupLockedVideo(video);
+                video.volume = STREAM_VOLUME;
 
                 wrapper.appendChild(video);
-                videoContainer.insertBefore(wrapper, playerLockOverlay);
+                videoContainer.appendChild(wrapper);
 
                 const url = videoUrls[streamer];
 
                 if (Hls.isSupported()) {
-                    const hls = new Hls({
-                        maxBufferLength: 30,
-                        enableWorker: true
-                    });
+                    const hls = new Hls({ maxBufferLength: 30 });
                     hls.loadSource(url);
                     hls.attachMedia(video);
+                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                    video.src = url;
                 } else {
                     video.src = url;
                 }
 
                 const btn = document.createElement('button');
-                btn.textContent = streamer;
+                btn.className = 'tab-btn';
+                btn.textContent = streamer.toUpperCase();
                 btn.onclick = () => switchToStreamer(index);
-
                 streamerTabs.appendChild(btn);
             });
 
-            lockPlayer();
+            isMashupActive = true;
+            playerLockOverlay.style.display = 'none';
             switchToStreamer(0);
         }
 
-        startBtn.addEventListener('click', async () => {
-            const streamers = getStreamerValues();
-
-            if (streamers.length < MIN_STREAMER_ROWS) {
-                alert('Нужно минимум 2 ника участников!');
-                return;
-            }
-
-            const unique = new Set(streamers.map(s => s.toLowerCase()));
-            if (unique.size !== streamers.length) {
-                alert('Ники не должны повторяться!');
-                return;
-            }
-
-            streamers.forEach(saveNickname);
-            hideAllDropdowns();
-            streamersList.innerHTML =
-                `✅ Участники: <strong>${streamers.length}</strong><br>` +
-                streamers.map(s => `• ${s}`).join('<br>');
-
-            foundStreamers = streamers;
-
-            startBtn.disabled = true;
-            stopBtn.disabled = false;
-
-            ipcRenderer.send('start-mashup', streamers);
-        });
-
-        stopBtn.addEventListener('click', () => {
-            clearInterval(autoSwitchInterval);
-            unlockPlayer();
-            clearVideoPlayers();
-            streamerTabs.innerHTML = '';
-            ipcRenderer.send('stop-mashup');
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
-            status.innerHTML = 'Ожидание запуска...';
-        });
-
-        playerLockOverlay.addEventListener('contextmenu', (e) => e.preventDefault());
-        document.getElementById('playerContainer').addEventListener('contextmenu', (e) => {
-            if (isMashupActive) e.preventDefault();
-        });
-
-        ipcRenderer.on('status-update', (event, message) => {
-            status.innerHTML = message;
-        });
-
         function switchToStreamer(index) {
-
             currentStreamerIndex = index;
 
             foundStreamers.forEach((streamer, i) => {
-
-                const video =
-                    document.getElementById(
-                        `player-${streamer}`
-                    );
-
+                const video = document.getElementById(`player-${streamer}`);
                 if (!video) return;
 
                 const isActive = i === index;
-
-                video.style.display =
-                    isActive ? 'block' : 'none';
-
-                video.volume = STREAM_VOLUME;
+                video.style.display = isActive ? 'block' : 'none';
                 video.muted = !isActive;
-
-                if (isActive && video.paused) {
-                    video.play().catch(() => {});
-                }
+                if (isActive && video.paused) video.play().catch(() => {});
             });
-
-        }
-
-        function setupStreamTabs(streamers) {
-            streamerTabs.innerHTML = '';
-            streamers.forEach((streamer, index) => {
-                const btn = document.createElement('button');
-                btn.setAttribute('data-streamer-btn', '');
-                btn.textContent = streamer.toUpperCase();
-                btn.style.cssText = `
-                    padding: 8px 12px; 
-                    background: none; 
-                    border: none; 
-                    color: #a9a9b2; 
-                    cursor: pointer; 
-                    font-weight: bold;
-                    font-size: 12px;
-                    border-bottom: 1px solid #3f3f46;
-                    transition: all 0.2s;
-                    white-space: nowrap;
-                `;
-                btn.onclick = () => {
-                    clearInterval(autoSwitchInterval);
-                    switchToStreamer(index);
-                    startAutoSwitch();
-                };
-                streamerTabs.appendChild(btn);
-            });
-
-            switchToStreamer(0);
         }
 
         function startAutoSwitch() {
             clearInterval(autoSwitchInterval);
+            if (!autoSwitchEnabled || foundStreamers.length < 2) return;
 
-            if (!autoSwitchEnabled) {
-                return;
-            }
-
-            const seconds =
-                parseInt(switchIntervalInput.value, 10) || 5;
-
+            const seconds = parseInt(switchIntervalInput.value, 10) || 5;
             autoSwitchInterval = setInterval(() => {
-                const nextIndex =
-                    (currentStreamerIndex + 1) %
-                    foundStreamers.length;
-
-                switchToStreamer(nextIndex);
+                const next = (currentStreamerIndex + 1) % foundStreamers.length;
+                switchToStreamer(next);
             }, seconds * 1000);
         }
 
-        ipcRenderer.on(
-            'video-urls',
-            (event, urls) => {
-
-                createPlayers(urls);
-
-                setupStreamTabs(
-                    Object.keys(urls)
-                );
-
-                startAutoSwitch();
+        startBtn.addEventListener('click', () => {
+            const streamers = getStreamerValues();
+            if (streamers.length < MIN_STREAMER_ROWS) {
+                alert('Нужно минимум 2 ника!');
+                return;
             }
-        );
+
+            streamers.forEach(saveNickname);
+            streamersList.innerHTML = `✅ Участники: <strong>${streamers.length}</strong><br>` + streamers.map(s => `• ${s}`).join('<br>');
+
+            status.innerHTML = '✅ Стримеры добавлены. Полный мэшап работает только в Electron-приложении.';
+            alert('В веб-версии полноценный запуск мэшапа (получение HLS-ссылок) невозможен.\n\nИспользуйте Electron-версию для полной функциональности.');
+        });
+
+        stopBtn.addEventListener('click', () => {
+            clearInterval(autoSwitchInterval);
+            clearVideoPlayers();
+            streamerTabs.innerHTML = '';
+            playerLockOverlay.style.display = 'flex';
+            isMashupActive = false;
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+        });
 
         autoSwitchBtn.addEventListener('click', () => {
             autoSwitchEnabled = !autoSwitchEnabled;
-            localStorage.setItem('autoSwitchEnabled', autoSwitchEnabled);
-            updateAutoSwitchUI();
+            autoSwitchBtn.classList.toggle('active', autoSwitchEnabled);
             startAutoSwitch();
         });
 
-        switchIntervalInput.addEventListener('change', () => {
-            localStorage.setItem(
-                'switchInterval',
-                switchIntervalInput.value
-            );
+        switchIntervalInput.addEventListener('change', startAutoSwitch);
 
-            startAutoSwitch();
-        });
+        console.log('%cTwitch Mashup Web версия загружена', 'color: #9146ff; font-size: 14px;');
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </body>
 </html>
