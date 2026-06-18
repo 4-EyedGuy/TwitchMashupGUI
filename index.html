@@ -165,7 +165,7 @@
 
     <!-- ЛЕВАЯ ПАНЕЛЬ -->
     <div class="panel">
-        <h3>🎛 Настройка Мэшапа</h3>
+        <h3>Twitch Multi-Stream Mashup</h3>
         
         <input type="hidden" id="clientId">
         <input type="hidden" id="accessToken">
@@ -566,7 +566,6 @@
             status.innerHTML = message;
         });
 
-        // Функция для переключения между стримерами
         function switchToStreamer(index) {
 
             currentStreamerIndex = index;
@@ -621,11 +620,9 @@
                 streamerTabs.appendChild(btn);
             });
 
-            // Загружаем первого стримера
             switchToStreamer(0);
         }
 
-        // Автоматическая смена каждые 5 секунд
         function startAutoSwitch() {
             clearInterval(autoSwitchInterval);
 
