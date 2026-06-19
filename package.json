@@ -1,6 +1,6 @@
 {
   "name": "twitch-mashup-gui",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Twitch Stream Mashup Tool",
   "main": "main.js",
   "type": "module",
@@ -21,7 +21,7 @@
   "license": "ISC",
   "build": {
     "appId": "com.4eyedguy.twitchmashup",
-    "productName": "TwitchMashup",
+    "productName": "TwitchMashupGUI",
     "directories": {
       "output": "dist"
     },
