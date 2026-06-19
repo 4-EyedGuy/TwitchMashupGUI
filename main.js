@@ -17,7 +17,7 @@ try {
     const configData = readFileSync(configPath, 'utf-8');
     config = JSON.parse(configData);
 } catch (error) {
-    console.log('Config не найден, используем пустые значения');
+    console.log('Config not found, using empty values');
 }
 
 function createWindow() {
@@ -104,33 +104,46 @@ async function getVideoUrl(streamer) {
 }
 
 ipcMain.on('start-mashup', async (event, streamers) => {
+    // Kill any previous ffmpeg before starting fresh
+    if (ffmpegProcess) {
+        isStopping = true;
+        ffmpegProcess.kill('SIGKILL');
+        ffmpegProcess = null;
+    }
     isStopping = false;
-    console.log(`[Mashup] 🎬 Запуск мэшапа для ${streamers.join(', ')}...`);
-    event.reply('status-update', '🔍 Проверка стримов через Streamlink...');
+
+    console.log(`[Mashup] Starting mashup for ${streamers.join(', ')}...`);
+    event.reply('status-update', '🔍 Checking streams via Streamlink...');
     
     const urls = await Promise.all(streamers.map(getAudioUrl));
+
+    // Bail out early if stopped while we were fetching
+    if (isStopping) return;
+
     const activeUrls = urls.filter(url => url !== null);
 
-    console.log(`[Mashup] Получено ${activeUrls.length} активных стримов из ${streamers.length}`);
+    console.log(`[Mashup] Got ${activeUrls.length} active streams out of ${streamers.length}`);
 
     if (activeUrls.length < 2) {
-        console.error('[Mashup] ❌ Нужно минимум 2 активных стрима!');
-        event.reply('status-update', '❌ Ошибка: Нужно минимум 2 активных стрима в эфире!');
+        console.error('[Mashup] At least 2 active streams required!');
+        event.reply('status-update', '❌ Error: At least 2 active streams required!');
         return;
     }
-
 
     if (activeUrls.length > 0) {
         const videoUrls = {};
         for (const streamer of streamers) {
-            videoUrls[streamer] =
-                await getVideoUrl(streamer);
+            if (isStopping) return;
+            videoUrls[streamer] = await getVideoUrl(streamer);
         }
+        if (isStopping) return;
         event.reply('video-urls', videoUrls);
     }
 
-    console.log(`[Mashup] 🎙 Запуск микширования ${activeUrls.length} стримов...`);
-    event.reply('status-update', '🎙 Найдено стримов: ' + activeUrls.length + '. Запуск микширования...');
+    if (isStopping) return;
+
+    console.log(`[Mashup] Starting audio mix for ${activeUrls.length} streams...`);
+    event.reply('status-update', '🎙 Streams found: ' + activeUrls.length + '. Starting mix...');
 
     const ffmpegArgs = [];
     activeUrls.forEach(url => {
@@ -146,25 +159,26 @@ ipcMain.on('start-mashup', async (event, streamers) => {
 
     ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
 
-    console.log('[FFmpeg] ▶️ Запущен процесс ffmpeg');
+    console.log('[FFmpeg] ffmpeg process started');
 
     ffmpegProcess.on('error', (error) => {
-        console.error('[FFmpeg] ❌ Ошибка запуска:', error.message);
+        console.error('[FFmpeg] Failed to start:', error.message);
         if (error.code === 'ENOENT') {
-            console.error('[FFmpeg] ⚠️ FFmpeg не найден! Установи: choco install ffmpeg');
-            event.reply('status-update', '❌ FFmpeg не найден. Установи командой: choco install ffmpeg');
+            console.error('[FFmpeg] FFmpeg not found! Install it: choco install ffmpeg');
+            event.reply('status-update', '❌ FFmpeg not found. Install it with: choco install ffmpeg');
         }
     });
 
     ffmpegProcess.stderr.on('data', (data) => {
+        if (isStopping) return;
         const log = data.toString();
         if (log.includes('size=')) {
-            event.reply('status-update', '🔴 Идет запись: ' + log.trim().substring(0, 40) + '...');
+            event.reply('status-update', '🔴 Recording: ' + log.trim().substring(0, 40) + '...');
         }
     });
 
     ffmpegProcess.on('close', (code) => {
-        console.log(`[FFmpeg] ⏹ Процесс завершен с кодом ${code}`);
+        console.log(`[FFmpeg] Process exited with code ${code}`);
 
         if (isStopping) {
             isStopping = false;
@@ -173,13 +187,13 @@ ipcMain.on('start-mashup', async (event, streamers) => {
 
         mainWindow.webContents.send(
             'status-update',
-            '⏹ Запись завершена. Файл сохранен.'
+            '⏹ Recording finished. File saved.'
         );
     });
 });
 
 ipcMain.on('stop-mashup', (event) => {
-    console.log('[Mashup] ⏹ Остановка мэшапа...');
+    console.log('[Mashup] Stopping mashup...');
 
     isStopping = true;
 
@@ -188,7 +202,7 @@ ipcMain.on('stop-mashup', (event) => {
         ffmpegProcess = null;
     }
 
-    event.reply('status-update', '⏹ Остановлено пользователем');
+    event.reply('status-update', '⏹ Stopped by user');
 });
 
 app.on('window-all-closed', () => {
