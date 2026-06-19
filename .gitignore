@@ -2,3 +2,4 @@ node_modules/
 twitch_mashup.mp3
 config.json
 .DS_Store
+dist/

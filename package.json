@@ -1,20 +1,39 @@
 {
   "name": "twitch-mashup-gui",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Twitch Stream Mashup Tool",
   "main": "main.js",
   "type": "module",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder"
   },
   "dependencies": {
     "execa": "^9.0.0"
   },
   "devDependencies": {
     "electron": "^42.4.1",
+    "electron-builder": "^26.15.3",
     "vite": "^8.0.16"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "build": {
+    "appId": "com.4eyedguy.twitchmashup",
+    "productName": "TwitchMashup",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ]
+    }
+  }
 }

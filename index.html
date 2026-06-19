@@ -173,5 +173,35 @@
 
     initRows();
 </script>
+
+<div id="version-info" style="position: fixed; bottom: 12px; left: 18px; font-size: 13px; color: #6b6b78; z-index: 100; pointer-events: none; user-select: none;">
+    TwitchMashup
+</div>
+
+<script>
+async function loadVersion() {
+    const versionEl = document.getElementById('version-info');
+    try {
+        if (typeof require !== 'undefined') {
+            const fs = require('fs');
+            const path = require('path');
+            const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+            versionEl.textContent = `TwitchMashup • v${pkg.version}`;
+        } 
+        else {
+            const response = await fetch('package.json');
+            if (response.ok) {
+                const pkg = await response.json();
+                versionEl.textContent = `TwitchMashup Web • v${pkg.version}`;
+            }
+        }
+    } catch (e) {
+        console.log('Не удалось определить версию автоматически', e);
+    }
+}
+
+loadVersion();
+</script>
+</script>
 </body>
 </html>
