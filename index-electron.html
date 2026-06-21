@@ -5,8 +5,33 @@
     <meta charset="UTF-8">
     <title>TwitchMashupGUI</title>
     <style>
-        body { margin: 0; padding: 15px; font-family: sans-serif; background: #121214; color: white; display: flex; height: 95vh; gap: 15px; overflow: hidden; }
-        .panel { width: 340px; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; }
+        body { margin: 0; padding: 15px; font-family: sans-serif; background: #121214; color: white; display: flex; height: 95vh; gap: 4px; overflow: hidden; }
+        .panel {
+            width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+            overflow-x: hidden;
+
+            scrollbar-width: thin;
+            scrollbar-color: #3f3f46 transparent;
+            scrollbar-gutter: stable;
+            padding-left: 4px;
+        }
+        .panel::-webkit-scrollbar {
+            width: 6px;
+        }
+        .panel::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .panel::-webkit-scrollbar-thumb {
+            background: #3f3f46;
+            border-radius: 999px;
+        }
+        .panel::-webkit-scrollbar-thumb:hover {
+            background: #52525b;
+        }
         .chat-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; background: #1e1e22; border-radius: 6px; border: 1px solid #3f3f46; }
         h3 { margin: 0 0 5px 0; color: #fff; word-break: break-word; }
         textarea { padding: 10px; border: 1px solid #3f3f46; background: #1e1e22; color: white; border-radius: 4px; font-size: 13px; resize: none; height: 80px; }
@@ -173,8 +198,68 @@
         }
         .recent-item-delete:hover { color: #ef4444; background: rgba(239,68,68,0.15); }
         #startBtn { background: #9146ff; color: white; }
-        #stopBtn { background: #eb0400; color: white; }
-        #status { color: #a9a9b2; font-size: 13px; line-height: 1.4; word-break: break-all; }
+        #stopBtn  { background: #eb0400; color: white; }
+        #syncBtn  { background: #1e1e22; color: #a9a9b2; border: 1px solid #3f3f46; font-size: 13px; padding: 8px 12px; }
+        #syncBtn:not(:disabled):hover { background: #2a2a2e; color: #e4e4e7; border-color: #9146ff; }
+        #status { color: #a9a9b2; font-size: 13px; line-height: 1.4; }
+        #recordingStats {
+            display: none;
+            margin-top: 6px;
+            padding: 8px 10px;
+            background: #1a1a1f;
+            border: 1px solid #2a2a2e;
+            border-left: 3px solid #eb0400;
+            border-radius: 4px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px 12px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+        #recordingStats.hidden { display: none; }
+        .rec-stat { display: flex; flex-direction: column; gap: 1px; }
+        .rec-stat-label { color: #52525b; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+        .rec-stat-value { color: #e4e4e7; font-weight: bold; }
+        .rec-dot {
+            display: inline-block; width: 7px; height: 7px;
+            background: #eb0400; border-radius: 50%;
+            animation: blink 1.2s ease-in-out infinite;
+            margin-right: 5px; vertical-align: middle;
+        }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+        #checkProgress {
+            margin-top: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .check-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #a9a9b2;
+            transition: color 0.2s;
+        }
+        .check-row.done-online  { color: #4ade80; }
+        .check-row.done-offline { color: #f87171; }
+        .check-icon {
+            font-size: 15px;
+            width: 18px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .check-spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid #3f3f46;
+            border-top-color: #9146ff;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            flex-shrink: 0;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        button:disabled { opacity: 0.45; cursor: not-allowed; }
         iframe { width: 100%; height: 100%; border: none; }
         #playerContainer { flex: 1; position: relative; overflow: hidden; background: #000; border-radius: 0 0 6px 6px; }
         #videoContainer { position: relative; width: 100%; height: 100%; }
@@ -192,6 +277,29 @@
             z-index: 20;
             cursor: default;
             background: transparent;
+        }
+        #streamersList {
+            max-height: 120px;
+            overflow-y: auto;
+            overflow-x: hidden;
+
+            word-break: break-word;
+
+            scrollbar-width: thin;
+            scrollbar-color: #3f3f46 transparent;
+        }
+        #streamersList::-webkit-scrollbar {
+            width: 5px;
+        }
+        #streamersList::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        #streamersList::-webkit-scrollbar-thumb {
+            background: #3f3f46;
+            border-radius: 999px;
+        }
+        #streamersList::-webkit-scrollbar-thumb:hover {
+            background: #52525b;
         }
     </style>
 </head>
@@ -213,8 +321,13 @@
                     <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
                 </svg>
             </button>
+            <button type="button" id="randomSwitchBtn" class="auto-switch-btn" title="Random order">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
+                </svg>
+            </button>
             <span class="auto-switch-label">every</span>
-            <input type="number" id="switchInterval" class="switch-interval-input" min="1" max="300" value="5">
+            <input type="number" id="switchInterval" class="switch-interval-input" min="10" max="300" value="10">
             <span class="auto-switch-label">sec</span>
         </div>
 
@@ -222,16 +335,25 @@
             <div class="switch-progress-bar" id="switchProgressBar"></div>
         </div>
 
-        <div style="margin-top: 10px; padding: 10px; background: #1e1e22; border-radius: 4px; border: 1px solid #3f3f46; min-height: 60px;">
+        <div style="margin-top: 10px; padding: 10px; background: #1e1e22; border-radius: 4px; border: 1px solid #3f3f46; min-height: 60px; overflow:hidden;">
             <strong style="color: #fff; font-size: 13px;">Found streamers:</strong>
-            <div id="streamersList" style="color: #a9a9b2; font-size: 12px; margin-top: 5px; line-height: 1.4;">Waiting...</div>
+            <div id="streamersList" style="color:#a9a9b2; font-size:12px; margin-top:5px; line-height:1.4; max-height:120px; overflow-y:auto; overflow-x:hidden; word-break:break-all; white-space:normal;">Waiting...</div>
         </div>
 
         <button id="startBtn" style="margin-top: 10px;">Start Mashup</button>
         <button id="stopBtn" disabled>Stop</button>
+        <button id="syncBtn" disabled title="Experimental: sync video to audio latency">Sync streams [BETA]</button>
+        <div id="syncStatus" style="font-size:11px; color:#71717a; display:none; margin-top:-8px;"></div>
 
         <div style="margin-top: 10px;"><strong>Status:</strong></div>
         <div id="status">Waiting to start...</div>
+        <div id="recordingStats" class="hidden">
+            <div class="rec-stat"><span class="rec-stat-label">Time</span><span class="rec-stat-value" id="recTime">—</span></div>
+            <div class="rec-stat"><span class="rec-stat-label">Size</span><span class="rec-stat-value" id="recSize">—</span></div>
+            <div class="rec-stat"><span class="rec-stat-label">Bitrate</span><span class="rec-stat-value" id="recBitrate">—</span></div>
+            <div class="rec-stat"><span class="rec-stat-label">Speed</span><span class="rec-stat-value" id="recSpeed">—</span></div>
+        </div>
+        <div id="checkProgress"></div>
     </div>
 
     <!-- RIGHT PANEL (VIDEO PLAYER WITH TABS) -->
@@ -261,18 +383,17 @@
         const switchIntervalInput = document.getElementById('switchInterval');
 
         let autoSwitchEnabled = true;
+        let randomSwitchEnabled = false;
         let foundStreamers = [];
         let currentStreamerIndex = 0;
         let autoSwitchInterval = null;
         let isMashupActive = false;
+        let syncEnabled = false;
+        let fetchStartTimes = {};
         const STREAM_VOLUME = 1;
         const MIN_STREAMER_ROWS = 2;
         let activeDropdown = null;
 
-        // Track HLS instances so we can destroy them on stop
-        const hlsInstances = [];
-
-        // Streamlink checking timer
         let checkingTimerInterval = null;
 
         function startCheckingTimer() {
@@ -458,68 +579,217 @@
         }
 
         function clearVideoPlayers() {
-            // Destroy all HLS instances first to stop network activity
-            hlsInstances.forEach(hls => { try { hls.destroy(); } catch(e) {} });
-            hlsInstances.length = 0;
-
-            // Pause and clear all video elements
-            videoContainer.querySelectorAll('.video-wrapper').forEach(el => {
-                const video = el.querySelector('video');
-                if (video) {
-                    video.pause();
-                    video.src = '';
-                    video.load();
-                }
-                el.remove();
-            });
+            for (const s of Object.keys(hlsMap)) destroyHlsForStreamer(s);
+            allVideoUrls = {};
         }
 
         // ── Auto-switch UI ────────────────────────────────────────────────
+
+        const randomSwitchBtn = document.getElementById('randomSwitchBtn');
 
         function updateAutoSwitchUI() {
             autoSwitchBtn.classList.toggle('active', autoSwitchEnabled);
             autoSwitchBtn.title = autoSwitchEnabled ? 'Auto-switch enabled' : 'Auto-switch disabled';
             switchIntervalInput.disabled = !autoSwitchEnabled;
+            randomSwitchBtn.classList.toggle('active', randomSwitchEnabled);
+            randomSwitchBtn.title = randomSwitchEnabled ? 'Random order (on)' : 'Random order (off)';
+            randomSwitchBtn.style.opacity = autoSwitchEnabled ? '1' : '0.4';
         }
 
-        autoSwitchEnabled = localStorage.getItem('autoSwitchEnabled') !== 'false';
+        autoSwitchEnabled   = localStorage.getItem('autoSwitchEnabled') !== 'false';
+        randomSwitchEnabled = localStorage.getItem('randomSwitchEnabled') === 'true';
         switchIntervalInput.value = localStorage.getItem('switchInterval') || '5';
         updateAutoSwitchUI();
 
         // ── IPC ───────────────────────────────────────────────────────────
+
+        const checkProgress = document.getElementById('checkProgress');
+
+        // ── Check progress ────────────────────────────────────────────────
+
+        function clearCheckProgress() {
+            checkProgress.innerHTML = '';
+        }
+
+        ipcRenderer.on('check-progress-init', (event, streamers) => {
+            checkProgress.innerHTML = '';
+            streamers.forEach(streamer => {
+                const row = document.createElement('div');
+                row.className = 'check-row';
+                row.id = `cp-${streamer}`;
+                const spinner = document.createElement('div');
+                spinner.className = 'check-spinner';
+                const label = document.createElement('span');
+                label.textContent = streamer;
+                row.appendChild(spinner);
+                row.appendChild(label);
+                checkProgress.appendChild(row);
+            });
+        });
+
+        ipcRenderer.on('check-progress-result', (event, { streamer, online }) => {
+            const row = document.getElementById(`cp-${streamer}`);
+            if (!row) return;
+            const spinner = row.querySelector('.check-spinner');
+            if (spinner) spinner.remove();
+            const icon = document.createElement('span');
+            icon.className = 'check-icon';
+            icon.textContent = online ? '✅' : '❌';
+            row.insertBefore(icon, row.firstChild);
+            row.classList.add(online ? 'done-online' : 'done-offline');
+        });
+
+        // ── Video URL progress ───────────────────────────────────────────
+
+        ipcRenderer.on('video-url-progress', (event, { streamer, done, found, skipped }) => {
+            const row = document.getElementById(`cp-${streamer}`);
+            if (!row) return;
+            if (skipped) return;
+
+            if (!done) {
+                if (!fetchStartTimes[streamer]) {
+                    fetchStartTimes[streamer] = Date.now();
+                }
+                let sub = row.querySelector('.cp-sub');
+                if (!sub) {
+                    sub = document.createElement('span');
+                    sub.className = 'cp-sub';
+                    sub.style.cssText = 'font-size:11px;color:#71717a;margin-left:6px;';
+                    row.appendChild(sub);
+                }
+
+                const updateTimer = () => {
+                    if (!fetchStartTimes[streamer]) return;
+                    const elapsed = Math.floor((Date.now() - fetchStartTimes[streamer]) / 1000);
+                    sub.textContent = `↳ fetching video URL... ${elapsed}s`;
+                };
+                updateTimer();
+                const timerInterval = setInterval(updateTimer, 500);
+
+                row.dataset.timerInterval = timerInterval;
+            } 
+            else {
+                const sub = row.querySelector('.cp-sub');
+                if (sub) {
+                    sub.textContent = found ? '↳ video URL ✓' : '↳ no video URL';
+                }
+                if (row.dataset.timerInterval) {
+                    clearInterval(parseInt(row.dataset.timerInterval));
+                    delete row.dataset.timerInterval;
+                }
+                delete fetchStartTimes[streamer];
+            }
+        });
+
+        let playersReady = false;
+        let pendingRecordingStatus = null;
+        let pendingRecordingStats = null;
+
+        ipcRenderer.on('ffmpeg-recording-start', () => {
+            if (playersReady) {
+            } else {
+            }
+        });
+
+        // ── Stopping state ────────────────────────────────────────────────
+
+        function setStoppingState() {
+            startBtn.disabled = true;
+            stopBtn.disabled = true;
+            status.innerHTML = '⏳ Stopping... waiting for processes to finish';
+        }
+
+        ipcRenderer.on('stop-progress', (event, phase) => {
+            if (phase === 'done') {
+                clearCheckProgress();
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+            }
+        });
 
         ipcRenderer.on('load-config', (event, config) => {
             if (config.clientId) clientIdInput.value = config.clientId;
             if (config.accessToken) accessTokenInput.value = config.accessToken;
         });
 
+        // ── Sliding-window HLS manager ────────────────────────────────
+        // allVideoUrls[streamer] = HLS url (or null)
+        // hlsMap[streamer]       = { hls, wrapper } for active instances
+        let allVideoUrls = {};
+        const hlsMap = {};   // streamer -> { hls, wrapper }
+        const WINDOW = 1;    // load [current-1 .. current+1]
+
+        function createHlsForStreamer(streamer, isActive) {
+            if (hlsMap[streamer]) return; // already loaded
+            const url = allVideoUrls[streamer];
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'video-wrapper';
+            wrapper.style.display = isActive ? 'block' : 'none';
+            const video = document.createElement('video');
+            video.id = `player-${streamer}`;
+            video.controls = false;
+            video.disablePictureInPicture = true;
+            video.disableRemotePlayback = true;
+            video.playsInline = true;
+            video.volume = STREAM_VOLUME;
+            video.muted = !isActive;
+            video.autoplay = true;
+            video.addEventListener('pause', () => { if (isMashupActive) video.play().catch(() => {}); });
+            video.addEventListener('volumechange', () => { if (video.volume !== STREAM_VOLUME) video.volume = STREAM_VOLUME; });
+            wrapper.appendChild(video);
+            videoContainer.insertBefore(wrapper, playerLockOverlay);
+
+            let hls = null;
+            if (url && Hls.isSupported()) {
+                hls = new Hls({ maxBufferLength: 30, enableWorker: true });
+                hls.loadSource(url);
+                hls.attachMedia(video);
+            } else if (url) {
+                video.src = url;
+            }
+            hlsMap[streamer] = { hls, wrapper, video };
+        }
+
+        function destroyHlsForStreamer(streamer) {
+            const entry = hlsMap[streamer];
+            if (!entry) return;
+            const { hls, wrapper, video } = entry;
+            if (hls) { try { hls.destroy(); } catch(e) {} }
+            video.pause(); video.src = ''; video.load();
+            wrapper.remove();
+            delete hlsMap[streamer];
+        }
+
+        let nextPreloadIndex = null;
+
+        function reconcileWindow(currentIndex) {
+            const desired = new Set();
+            desired.add(foundStreamers[currentIndex]);
+
+            if (!randomSwitchEnabled) {
+                const prev = (currentIndex - 1 + foundStreamers.length) % foundStreamers.length;
+                desired.add(foundStreamers[prev]);
+            }
+
+            if (nextPreloadIndex !== null && nextPreloadIndex !== currentIndex) {
+                desired.add(foundStreamers[nextPreloadIndex]);
+            }
+
+            for (const s of Object.keys(hlsMap)) {
+                if (!desired.has(s)) destroyHlsForStreamer(s);
+            }
+            for (const s of desired) {
+                createHlsForStreamer(s, s === foundStreamers[currentIndex]);
+            }
+        }
+
         function createPlayers(videoUrls) {
-            clearVideoPlayers();
+            for (const s of Object.keys(hlsMap)) destroyHlsForStreamer(s);
+            allVideoUrls = videoUrls;
             foundStreamers = Object.keys(videoUrls);
-
-            foundStreamers.forEach((streamer, index) => {
-                const wrapper = document.createElement('div');
-                wrapper.className = 'video-wrapper';
-                const video = document.createElement('video');
-                video.id = `player-${streamer}`;
-                video.autoplay = true;
-                video.muted = index !== 0;
-                setupLockedVideo(video);
-                wrapper.appendChild(video);
-                videoContainer.insertBefore(wrapper, playerLockOverlay);
-
-                const url = videoUrls[streamer];
-                if (url && Hls.isSupported()) {
-                    const hls = new Hls({ maxBufferLength: 30, enableWorker: true });
-                    hls.loadSource(url);
-                    hls.attachMedia(video);
-                    hlsInstances.push(hls);
-                } else if (url) {
-                    video.src = url;
-                }
-            });
-
             lockPlayer();
+            reconcileWindow(0);
         }
 
         startBtn.addEventListener('click', async () => {
@@ -542,28 +812,43 @@
             startBtn.disabled = true;
             stopBtn.disabled = false;
 
+            playersReady = false;
+            pendingRecordingStatus = null;
+            pendingRecordingStats = null;
+            showRecordingStats(false);
             startCheckingTimer();
             ipcRenderer.send('start-mashup', streamers);
         });
+        
+        document.querySelectorAll('.check-row').forEach(row => {
+            if (row.dataset.timerInterval) {
+                clearInterval(parseInt(row.dataset.timerInterval));
+            }
+        });
+        fetchStartTimes = {};
 
         stopBtn.addEventListener('click', () => {
             stopCheckingTimer();
             clearInterval(autoSwitchInterval);
+            
             unlockPlayer();
             clearVideoPlayers();
-            streamerTabs.innerHTML = '';
-
-            // Reset progress bar
+            streamerTabs.innerHTML = ''; 
+            streamersList.innerHTML = 'Waiting...';
+            
             const progressWrap = document.getElementById('switchProgressWrap');
             const progressBar = document.getElementById('switchProgressBar');
             progressBar.style.transition = 'none';
             progressBar.style.width = '0%';
             progressWrap.style.display = 'none';
 
+            playersReady = false;
+            pendingRecordingStatus = null;
+            pendingRecordingStats = null;
+            showRecordingStats(false);
+            disableSync();
+            setStoppingState();
             ipcRenderer.send('stop-mashup');
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
-            status.innerHTML = 'Waiting to start...';
         });
 
         playerLockOverlay.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -571,11 +856,39 @@
             if (isMashupActive) e.preventDefault();
         });
 
+        const recordingStatsEl = document.getElementById('recordingStats');
+        const recTime    = document.getElementById('recTime');
+        const recSize    = document.getElementById('recSize');
+        const recBitrate = document.getElementById('recBitrate');
+        const recSpeed   = document.getElementById('recSpeed');
+
+        function showRecordingStats(show) {
+            recordingStatsEl.classList.toggle('hidden', !show);
+        }
+
+        ipcRenderer.on('recording-stats', (event, { size, time, bitrate, speed }) => {
+            if (!playersReady) { pendingRecordingStats = { size, time, bitrate, speed }; return; }
+            showRecordingStats(true);
+            status.innerHTML = '<span class="rec-dot"></span> Recording';
+            if (time)    recTime.textContent    = time;
+            if (size)    recSize.textContent    = size;
+            if (bitrate) recBitrate.textContent = bitrate + 's';
+            if (speed)   recSpeed.textContent   = speed;
+        });
+
         ipcRenderer.on('status-update', (event, message) => {
-            // Don't overwrite the checking timer with backend "Checking..." message —
-            // the timer is already running in the renderer
             if (message.includes('Checking streams via Streamlink')) return;
             stopCheckingTimer();
+
+            if (message.includes('🎙') || message.includes('⏹')) {
+                clearCheckProgress();
+                showRecordingStats(false);
+            }
+
+            if (message.includes('⏹') || message.includes('❌')) {
+                showRecordingStats(false);
+            }
+
             status.innerHTML = message;
         });
 
@@ -583,20 +896,126 @@
 
         function switchToStreamer(index) {
             currentStreamerIndex = index;
-            foundStreamers.forEach((streamer, i) => {
-                const video = document.getElementById(`player-${streamer}`);
-                if (!video) return;
+
+            reconcileWindow(index);
+
+            for (const [streamer, entry] of Object.entries(hlsMap)) {
+                const i = foundStreamers.indexOf(streamer);
                 const isActive = i === index;
-                video.style.display = isActive ? 'block' : 'none';
-                video.volume = STREAM_VOLUME;
-                video.muted = !isActive;
-                if (isActive && video.paused) video.play().catch(() => {});
-            });
+                entry.wrapper.style.display = isActive ? 'block' : 'none';
+                entry.video.muted = !isActive;
+                entry.video.volume = STREAM_VOLUME;
+                if (isActive && entry.video.paused) entry.video.play().catch(() => {});
+            }
+
             document.querySelectorAll('#streamerTabs .tab-btn').forEach((btn, i) => {
                 btn.classList.toggle('active', i === index);
             });
         }
 
+        // ── Experimental stream sync ──────────────────────────────────────
+        // Strategy: use Web Audio API to measure actual playback position of each
+        // stream relative to a shared AudioContext clock, then nudge video.currentTime
+        // to compensate drift. Works because all HLS streams have wall-clock timestamps.
+
+        const syncBtn    = document.getElementById('syncBtn');
+        const syncStatus = document.getElementById('syncStatus');
+        let   syncAudioCtx = null;
+        let   syncInterval = null;
+        let   syncBaselines = {};
+        const SYNC_THRESHOLD_MS = 80;
+        const SYNC_MAX_JUMP_MS  = 2000;
+
+        function syncLog(msg, color = '#71717a') {
+            syncStatus.style.display = 'block';
+            syncStatus.style.color = color;
+            syncStatus.textContent = msg;
+        }
+
+        function getVideoEl(streamer) {
+            const entry = hlsMap[streamer];
+            return entry ? entry.video : null;
+        }
+
+        async function measureAndSync() {
+            if (!syncAudioCtx) {
+                syncAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
+            const results = [];
+            for (const streamer of foundStreamers) {
+                const video = getVideoEl(streamer);
+                if (!video || isNaN(video.currentTime) || video.readyState < 2) continue;
+                results.push({ streamer, ct: video.currentTime });
+            }
+
+            if (results.length < 2) {
+                syncLog('⚠ Need ≥2 loaded streams to sync', '#f59e0b');
+                return;
+            }
+
+            const maxCt = Math.max(...results.map(r => r.ct));
+
+            let nudged = 0;
+            for (const { streamer, ct } of results) {
+                const driftMs = (maxCt - ct) * 1000;
+                if (driftMs < SYNC_THRESHOLD_MS) continue;
+                if (driftMs > SYNC_MAX_JUMP_MS) {
+                    syncLog(`⚠ ${streamer}: drift ${driftMs.toFixed(0)}ms too large, skipped`, '#f59e0b');
+                    continue;
+                }
+                const video = getVideoEl(streamer);
+                if (!video) continue;
+                video.currentTime = ct + (driftMs / 1000) * 0.9;
+                nudged++;
+                console.log(`[Sync] ${streamer}: nudged +${driftMs.toFixed(0)}ms`);
+            }
+
+            if (nudged === 0) {
+                syncLog(`✅ In sync (max drift < ${SYNC_THRESHOLD_MS}ms)`, '#4ade80');
+            } else {
+                syncLog(`⚡ Corrected ${nudged} stream${nudged > 1 ? 's' : ''}`, '#9146ff');
+            }
+        }
+
+        function startAutoSync() {
+            stopAutoSync();
+            measureAndSync();
+            syncInterval = setInterval(measureAndSync, 8000);
+        }
+
+        function stopAutoSync() {
+            if (syncInterval) { clearInterval(syncInterval); syncInterval = null; }
+            if (syncAudioCtx) { syncAudioCtx.close().catch(() => {}); syncAudioCtx = null; }
+            syncBaselines = {};
+            syncStatus.style.display = 'none';
+        }
+
+        syncBtn.addEventListener('click', () => {
+
+            syncEnabled = !syncEnabled;
+
+            if (syncEnabled) {
+                startAutoSync();
+                syncBtn.textContent = '⏹ Stop Sync';
+                syncLog('⚡ Auto-sync enabled', '#9146ff');
+            } else {
+                stopAutoSync();
+                syncBtn.textContent = '⚡ Sync streams';
+            }
+        });
+
+        function enableSync() {
+            syncBtn.disabled = false;
+        }
+
+        function disableSync() {
+            syncEnabled = false;
+            syncBtn.textContent = '⚡ Sync streams';
+            syncBtn.disabled = true;
+            stopAutoSync();
+        }
+        
         function setupStreamTabs(streamers) {
             streamerTabs.innerHTML = '';
             streamers.forEach((streamer, index) => {
@@ -605,6 +1024,7 @@
                 btn.textContent = streamer.toUpperCase();
                 btn.onclick = () => {
                     clearInterval(autoSwitchInterval);
+                    nextPreloadIndex = null;
                     switchToStreamer(index);
                     startAutoSwitch();
                 };
@@ -613,38 +1033,57 @@
             switchToStreamer(0);
         }
 
-        function startAutoSwitch() {
-            clearInterval(autoSwitchInterval);
-            const progressWrap = document.getElementById('switchProgressWrap');
-            const progressBar = document.getElementById('switchProgressBar');
+        function pickNextIndex(currentIndex) {
+            if (!randomSwitchEnabled || foundStreamers.length <= 1) {
+                return (currentIndex + 1) % foundStreamers.length;
+            }
+            let next;
+            do { next = Math.floor(Math.random() * foundStreamers.length); }
+            while (next === currentIndex && foundStreamers.length > 1);
+            return next;
+        }
 
+        function resetProgressBar(seconds) {
+            const progressWrap = document.getElementById('switchProgressWrap');
+            const progressBar  = document.getElementById('switchProgressBar');
             progressBar.style.transition = 'none';
             progressBar.style.width = '0%';
             progressWrap.style.display = 'none';
+            if (seconds == null) return;
+            progressWrap.style.display = 'block';
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                progressBar.style.transition = `width ${seconds}s linear`;
+                progressBar.style.width = '100%';
+            }));
+        }
+
+        function startAutoSwitch() {
+            clearInterval(autoSwitchInterval);
+            resetProgressBar(null);
 
             if (!autoSwitchEnabled) return;
 
-            const seconds = parseInt(switchIntervalInput.value, 10) || 5;
+            let seconds = parseInt(switchIntervalInput.value, 10) || 10;
+            if (seconds < 10) {
+                seconds = 10;
+                switchIntervalInput.value = 10;
+            }
 
-            progressWrap.style.display = 'block';
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    progressBar.style.transition = `width ${seconds}s linear`;
-                    progressBar.style.width = '100%';
-                });
-            });
+            nextPreloadIndex = pickNextIndex(currentStreamerIndex);
+            reconcileWindow(currentStreamerIndex);
+
+            resetProgressBar(seconds);
 
             autoSwitchInterval = setInterval(() => {
-                const nextIndex = (currentStreamerIndex + 1) % foundStreamers.length;
-                switchToStreamer(nextIndex);
-                progressBar.style.transition = 'none';
-                progressBar.style.width = '0%';
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                        progressBar.style.transition = `width ${seconds}s linear`;
-                        progressBar.style.width = '100%';
-                    });
-                });
+                const goTo = nextPreloadIndex !== null
+                    ? nextPreloadIndex
+                    : pickNextIndex(currentStreamerIndex);
+
+                nextPreloadIndex = pickNextIndex(goTo);
+
+                switchToStreamer(goTo);
+
+                resetProgressBar(seconds);
             }, seconds * 1000);
         }
 
@@ -652,6 +1091,21 @@
             createPlayers(urls);
             setupStreamTabs(Object.keys(urls));
             startAutoSwitch();
+            playersReady = true;
+            enableSync();
+            if (pendingRecordingStats) {
+                showRecordingStats(true);
+                status.innerHTML = '<span class="rec-dot"></span> Recording';
+                const s = pendingRecordingStats;
+                if (s.time)    recTime.textContent    = s.time;
+                if (s.size)    recSize.textContent    = s.size;
+                if (s.bitrate) recBitrate.textContent = s.bitrate + 's';
+                if (s.speed)   recSpeed.textContent   = s.speed;
+                pendingRecordingStats = null;
+            } else if (pendingRecordingStatus) {
+                status.innerHTML = pendingRecordingStatus;
+                pendingRecordingStatus = null;
+            }
         });
 
         autoSwitchBtn.addEventListener('click', () => {
@@ -661,14 +1115,81 @@
             startAutoSwitch();
         });
 
+        randomSwitchBtn.addEventListener('click', () => {
+            if (!autoSwitchEnabled) return; // no-op if auto-switch is off
+            randomSwitchEnabled = !randomSwitchEnabled;
+            localStorage.setItem('randomSwitchEnabled', randomSwitchEnabled);
+            updateAutoSwitchUI();
+            nextPreloadIndex = pickNextIndex(currentStreamerIndex);
+            reconcileWindow(currentStreamerIndex);
+            startAutoSwitch();
+        });
+
         switchIntervalInput.addEventListener('change', () => {
             localStorage.setItem('switchInterval', switchIntervalInput.value);
             startAutoSwitch();
+        });
+
+        // ── Auto-updater UI ───────────────────────────────────────────────
+        ipcRenderer.on('update-status', (event, info) => {
+            const banner      = document.getElementById('updateBanner');
+            const text        = document.getElementById('updateText');
+            const installBtn  = document.getElementById('updateInstallBtn');
+            const progressWrap= document.getElementById('updateProgress');
+            const progressBar = document.getElementById('updateProgressBar');
+            const progressTxt = document.getElementById('updateProgressText');
+
+            banner.style.display = 'block';
+
+            if (info.type === 'available') {
+                text.innerHTML = `🔄 Update <strong>v${info.version}</strong> available — downloading...`;
+                installBtn.style.display = 'none';
+                progressWrap.style.display = 'block';
+            } else if (info.type === 'downloading') {
+                text.innerHTML = `⬇️ Downloading update...`;
+                progressBar.style.width = info.percent + '%';
+                const mb = n => (n / 1048576).toFixed(1) + ' MB';
+                progressTxt.textContent = `${mb(info.transferred)} / ${mb(info.total)} (${info.percent}%)`;
+            } else if (info.type === 'ready') {
+                text.innerHTML = `✅ Update <strong>v${info.version}</strong> ready`;
+                progressWrap.style.display = 'none';
+                installBtn.style.display = 'inline-block';
+            }
+        });
+
+        document.getElementById('updateInstallBtn').addEventListener('click', () => {
+            ipcRenderer.send('install-update');
         });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
     <div id="versionLabel" style="position:fixed; bottom:10px; left:14px; font-size:12px; color:#3f3f50; pointer-events:none; user-select:none; z-index:999;">TwitchMashupGUI</div>
+
+    <!-- Auto-update banner -->
+    <div id="updateBanner" style="
+        display:none; position:fixed; bottom:12px; right:16px; z-index:1000;
+        background:#1e1e22; border:1px solid #3f3f46; border-left:3px solid #9146ff;
+        border-radius:6px; padding:10px 14px; max-width:260px;
+        font-size:13px; color:#e4e4e7; box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    ">
+        <div id="updateText" style="margin-bottom:8px;"></div>
+        <div style="display:flex; gap:8px; align-items:center;">
+            <button id="updateInstallBtn" style="
+                display:none; padding:6px 14px; background:#9146ff; color:white;
+                border:none; border-radius:4px; font-size:12px; font-weight:bold; cursor:pointer;
+            ">Install &amp; Restart</button>
+            <div id="updateProgress" style="display:none; width:100%;">
+                <div style="height:3px; background:#2a2a2e; border-radius:2px; overflow:hidden;">
+                    <div id="updateProgressBar" style="height:100%; width:0%; background:#9146ff; transition:width 0.3s;"></div>
+                </div>
+                <span id="updateProgressText" style="font-size:11px; color:#71717a; margin-top:3px; display:block;"></span>
+            </div>
+            <button onclick="document.getElementById('updateBanner').style.display='none'" style="
+                margin-left:auto; background:none; border:none; color:#52525b;
+                font-size:18px; cursor:pointer; padding:0; line-height:1;
+            ">×</button>
+        </div>
+    </div>
     <script>
         (() => {
             const el = document.getElementById('versionLabel');

@@ -1,6 +1,6 @@
 {
   "name": "twitch-mashup-gui",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Twitch Stream Mashup Tool",
   "main": "main.js",
   "type": "module",
@@ -9,7 +9,8 @@
     "build": "electron-builder"
   },
   "dependencies": {
-    "execa": "^9.0.0"
+    "execa": "^9.0.0",
+    "electron-updater": "^6.3.9"
   },
   "devDependencies": {
     "electron": "^42.4.1",
@@ -24,6 +25,11 @@
     "productName": "TwitchMashupGUI",
     "directories": {
       "output": "dist"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "4eyedguy",
+      "repo": "twitch-mashup-gui"
     },
     "win": {
       "target": [

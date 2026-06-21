@@ -4,6 +4,7 @@ import { spawn } from 'child_process';
 import { execa } from 'execa';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+let autoUpdater = null;
 
 let mainWindow;
 let ffmpegProcess = null;
@@ -24,8 +25,8 @@ function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1400,
         height: 850,
-        minWidth: 1000,
-        minHeight: 600,
+        minWidth: 1200,
+        minHeight: 820,
         backgroundColor: '#121214',
         webPreferences: {
             nodeIntegration: true,
@@ -47,14 +48,74 @@ function createWindow() {
 
     mainWindow.loadFile('index-electron.html');
 
-    // mainWindow.webContents.openDevTools();
+    // ── DevTools ──────────────────────────────────────────────
+    mainWindow.webContents.openDevTools();
     
     mainWindow.webContents.on('did-finish-load', () => {
         mainWindow.webContents.send('load-config', config);
     });
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+    createWindow();
+    setupAutoUpdater();
+});
+
+async function setupAutoUpdater() {
+    try {
+        const updaterModule = await import('electron-updater');
+        autoUpdater = updaterModule.autoUpdater ?? updaterModule.default?.autoUpdater ?? updaterModule.default;
+    } catch (err) {
+        console.error('[Updater] Could not load electron-updater:', err.message);
+        return;
+    }
+
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+
+    autoUpdater.on('checking-for-update', () => {
+        console.log('[Updater] Checking for update...');
+    });
+
+    autoUpdater.on('update-available', (info) => {
+        console.log(`[Updater] Update available: ${info.version}`);
+        mainWindow.webContents.send('update-status', {
+            type: 'available',
+            version: info.version
+        });
+    });
+
+    autoUpdater.on('update-not-available', () => {
+        console.log('[Updater] Up to date.');
+    });
+
+    autoUpdater.on('download-progress', (progress) => {
+        const pct = Math.round(progress.percent);
+        mainWindow.webContents.send('update-status', {
+            type: 'downloading',
+            percent: pct,
+            transferred: progress.transferred,
+            total: progress.total
+        });
+    });
+
+    autoUpdater.on('update-downloaded', (info) => {
+        console.log(`[Updater] Update downloaded: ${info.version}`);
+        mainWindow.webContents.send('update-status', {
+            type: 'ready',
+            version: info.version
+        });
+    });
+
+    autoUpdater.on('error', (err) => {
+        console.error('[Updater] Error:', err.message);
+    });
+
+    autoUpdater.checkForUpdates().catch(err => console.error('[Updater]', err.message));
+    setInterval(() => {
+        autoUpdater.checkForUpdates().catch(err => console.error('[Updater]', err.message));
+    }, 30 * 60 * 1000);
+}
 
 async function getAudioUrl(streamer) {
     try {
@@ -104,7 +165,6 @@ async function getVideoUrl(streamer) {
 }
 
 ipcMain.on('start-mashup', async (event, streamers) => {
-    // Kill any previous ffmpeg before starting fresh
     if (ffmpegProcess) {
         isStopping = true;
         ffmpegProcess.kill('SIGKILL');
@@ -114,10 +174,16 @@ ipcMain.on('start-mashup', async (event, streamers) => {
 
     console.log(`[Mashup] Starting mashup for ${streamers.join(', ')}...`);
     event.reply('status-update', '🔍 Checking streams via Streamlink...');
-    
-    const urls = await Promise.all(streamers.map(getAudioUrl));
+    event.reply('check-progress-init', streamers);
 
-    // Bail out early if stopped while we were fetching
+    const urls = await Promise.all(streamers.map(async (streamer) => {
+        const url = await getAudioUrl(streamer);
+        if (!isStopping) {
+            event.reply('check-progress-result', { streamer, online: url !== null });
+        }
+        return url;
+    }));
+
     if (isStopping) return;
 
     const activeUrls = urls.filter(url => url !== null);
@@ -131,10 +197,23 @@ ipcMain.on('start-mashup', async (event, streamers) => {
     }
 
     if (activeUrls.length > 0) {
+        const onlineStreamers = streamers.filter((s, i) => urls[i] !== null);
+        event.reply('status-update', `📺 Fetching video URLs (0/${onlineStreamers.length})...`);
+
         const videoUrls = {};
+        let fetched = 0;
         for (const streamer of streamers) {
             if (isStopping) return;
-            videoUrls[streamer] = await getVideoUrl(streamer);
+            if (urls[streamers.indexOf(streamer)] === null) {
+                event.reply('video-url-progress', { streamer, done: true, skipped: true });
+                continue;
+            }
+            event.reply('video-url-progress', { streamer, done: false });
+            const url = await getVideoUrl(streamer);
+            fetched++;
+            videoUrls[streamer] = url;
+            event.reply('video-url-progress', { streamer, done: true, found: url !== null });
+            event.reply('status-update', `📺 Fetching video URLs (${fetched}/${onlineStreamers.length})...`);
         }
         if (isStopping) return;
         event.reply('video-urls', videoUrls);
@@ -143,6 +222,7 @@ ipcMain.on('start-mashup', async (event, streamers) => {
     if (isStopping) return;
 
     console.log(`[Mashup] Starting audio mix for ${activeUrls.length} streams...`);
+    event.reply('ffmpeg-ready', true);
     event.reply('status-update', '🎙 Streams found: ' + activeUrls.length + '. Starting mix...');
 
     const ffmpegArgs = [];
@@ -158,6 +238,7 @@ ipcMain.on('start-mashup', async (event, streamers) => {
     );
 
     ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
+    let ffmpegRecordingStarted = false;
 
     console.log('[FFmpeg] ffmpeg process started');
 
@@ -173,7 +254,20 @@ ipcMain.on('start-mashup', async (event, streamers) => {
         if (isStopping) return;
         const log = data.toString();
         if (log.includes('size=')) {
-            event.reply('status-update', '🔴 Recording: ' + log.trim().substring(0, 40) + '...');
+            if (!ffmpegRecordingStarted) {
+                ffmpegRecordingStarted = true;
+                event.reply('ffmpeg-recording-start');
+            }
+            const sizeMatch   = log.match(/size=\s*(\S+)/);
+            const timeMatch   = log.match(/time=\s*(\S+)/);
+            const bitrateMatch= log.match(/bitrate=\s*(\S+)/);
+            const speedMatch  = log.match(/speed=\s*(\S+)/);
+            event.reply('recording-stats', {
+                size:    sizeMatch    ? sizeMatch[1]    : null,
+                time:    timeMatch    ? timeMatch[1]    : null,
+                bitrate: bitrateMatch ? bitrateMatch[1] : null,
+                speed:   speedMatch   ? speedMatch[1]   : null,
+            });
         }
     });
 
@@ -197,12 +291,22 @@ ipcMain.on('stop-mashup', (event) => {
 
     isStopping = true;
 
+    event.reply('stop-progress', 'stopping-ffmpeg');
+
     if (ffmpegProcess) {
         ffmpegProcess.kill('SIGKILL');
         ffmpegProcess = null;
     }
 
-    event.reply('status-update', '⏹ Stopped by user');
+    setTimeout(() => {
+        event.reply('stop-progress', 'done');
+        event.reply('status-update', '⏹ Stopped by user');
+        event.reply('video-urls', {});
+    }, 400);
+});
+
+ipcMain.on('install-update', () => {
+    autoUpdater.quitAndInstall();
 });
 
 app.on('window-all-closed', () => {
